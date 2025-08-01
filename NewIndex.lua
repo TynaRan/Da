@@ -1,3 +1,14 @@
+local function r()
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if o.Name=="HB" then o:Destroy() end
+    end
+end
+r()
+workspace.DescendantAdded:Connect(function(o)
+    if o.Name=="HB" then o:Destroy() end
+end)
+game:GetService("Lighting"):ClearAllChildren()
+print("setting done")
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
 local Library = loadstring(game:HttpGet(repo..'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo..'addons/ThemeManager.lua'))()
