@@ -1,14 +1,26 @@
-local function r()
-    for _,o in ipairs(workspace:GetDescendants()) do
-        if o.Name=="HB" then o:Destroy() end
+local v1 = game:GetService("Players").LocalPlayer
+
+local function v2()
+    if v1.Character then
+        for _,v3 in ipairs(v1.Character:GetDescendants()) do
+            if v3.Name=="HB" then v3:Destroy() end
+        end
     end
 end
-r()
-workspace.DescendantAdded:Connect(function(o)
-    if o.Name=="HB" then o:Destroy() end
+
+v2()
+
+v1.CharacterAdded:Connect(function(v4)
+    v4:WaitForChild("Humanoid")
+    for _,v5 in ipairs(v4:GetDescendants()) do
+        if v5.Name=="HB" then v5:Destroy() end
+    end
+    v4.DescendantAdded:Connect(function(v6)
+        if v6.Name=="HB" then v6:Destroy() end
+    end)
 end)
 game:GetService("Lighting"):ClearAllChildren()
-print("setting done")
+print("--// IndexWare LOGS: setting done")
 local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
 local Library = loadstring(game:HttpGet(repo..'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo..'addons/ThemeManager.lua'))()
@@ -127,7 +139,7 @@ local function ShowHitNotification(target)
     sound.Volume = 0.75
     sound.Parent = workspace
     sound:Play()
-    Library:Notify(string.format("Hit %s [%s] | %d | %s", name, hitPart, distance, health))
+    Library:Notify(string.format("Hit %s [%s] | Distance %d | Health %s", name, hitPart, distance, health))
 end
 
 Settings.RichShader = false
