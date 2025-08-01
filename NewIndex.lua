@@ -104,7 +104,7 @@ local function CreateRichTracer(startPos, endPos)
         local light = Instance.new('PointLight', tracer)
         light.Color = Settings.TracerColor
         light.Range = 15
-        light.Brightnes = 5
+        light.Brightness = 5
     end
     
     tracer.Parent = workspace
@@ -122,7 +122,11 @@ local function ShowHitNotification(target)
     local hitPart = target.Name
     local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
     local health = humanoid and string.format("%d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)) or "N/A"
-    
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://160432334"  
+    sound.Volume = 0.75
+    sound.Parent = workspace
+    sound:Play()
     Library:Notify(string.format("Hit %s [%s] | %d | %s", name, hitPart, distance, health))
 end
 
