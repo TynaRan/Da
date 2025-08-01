@@ -87,113 +87,63 @@ FOVCircle.Radius = Settings.FOV
 FOVCircle.Color = Settings.FOVColor
 FOVCircle.Thickness = 2
 FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-
-local v1 = game:GetService("TweenService")
-local v2 = game:GetService("RunService")
-
-local function CreateRichTracer(v3, v4)
+local function CreateRichTracer(startPos, endPos)
     if not Settings.BulletTracers then return end
     
-    local v5 = (v4 - v3).Magnitude
-    local v6 = Instance.new('Part')
-    v6.Size = Vector3.new(Settings.TracerWidth/3, Settings.TracerWidth/3, 0.1)
-    v6.CFrame = CFrame.new(v3, v4)
-    v6.Anchored = true
-    v6.CanCollide = false
-    v6.Material = Enum.Material.Neon
-    v6.Color = Settings.TracerColor
-    v6.Transparency = 0.3
-
-    local v19 = Instance.new('MeshPart')
-    v19.MeshId = "rbxassetid://3726303787"
-    v19.TextureId = "rbxassetid://3726303793"
-    v19.Size = Vector3.new(Settings.TracerWidth*2, Settings.TracerWidth*2, Settings.TracerWidth*2)
-    v19.CFrame = v6.CFrame * CFrame.new(0, 0, -0.5)
-    v19.Anchored = true
-    v19.CanCollide = false
-    v19.Color = Settings.TracerColor
-    v19.Transparency = 0.5
-    v19.Parent = workspace
-
-    local v7 = Instance.new("Trail", v6)
-    v7.Color = ColorSequence.new(Settings.TracerColor)
-    v7.LightEmission = 1
-    v7.Lifetime = Settings.TracerDuration * 0.3
-    v7.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.3),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    local v8 = Instance.new("Attachment", v6)
-    local v9 = Instance.new("Attachment", v6)
-    v8.Position = Vector3.new(0, 0, 0.5)
-    v9.Position = Vector3.new(0, 0, -0.5)
-    v7.Attachment0 = v8
-    v7.Attachment1 = v9
-
-    local v10 = v1:Create(v6, TweenInfo.new(Settings.TracerDuration * 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, v5),
-        CFrame = CFrame.new(v3, v4) * CFrame.new(0, 0, -v5/2),
-        Transparency = 0.7
-    })
-
-    local v20 = v1:Create(v19, TweenInfo.new(Settings.TracerDuration * 0.15, Enum.EasingStyle.Quad), {
-        CFrame = CFrame.new(v3, v4) * CFrame.new(0, 0, -v5/2 - 0.5),
-        Transparency = 0.8
-    })
+    local TweenService = game:GetService("TweenService")
+    local distance = (startPos - endPos).Magnitude
+    local tracer = Instance.new('Part')
     
-    local v11 = v1:Create(v6, TweenInfo.new(Settings.TracerDuration * 0.85, Enum.EasingStyle.Linear), {
-        Transparency = 1
-    })
+    tracer.Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, distance)
+    tracer.CFrame = CFrame.new(startPos, endPos) * CFrame.new(0, 0, -distance/2)
+    tracer.Anchored = true
+    tracer.CanCollide = false
+    tracer.Material = Enum.Material.Neon
+    tracer.Color = Settings.TracerColor
+    tracer.Transparency = 1
+    tracer.Parent = workspace
 
-    local v21 = v1:Create(v19, TweenInfo.new(Settings.TracerDuration * 0.85, Enum.EasingStyle.Linear), {
-        Transparency = 1
-    })
-
+    local light
     if Settings.RichBullet then
-        local v13 = Instance.new('SurfaceGui', v6)
-        v13.Face = Enum.NormalId.Top
-        v13.AlwaysOnTop = true
-        v13.Adornee = v6
+        local glow = Instance.new('SurfaceGui', tracer)
+        glow.Face = Enum.NormalId.Front
+        glow.AlwaysOnTop = true
+        glow.Adornee = tracer
         
-        local v14 = Instance.new('Frame', v13)
-        v14.Size = UDim2.new(1, 0, 1, 0)
-        v14.BackgroundColor3 = Settings.TracerColor
-        v14.BackgroundTransparency = 0.5
-        v14.BorderSizePixel = 0
+        local frame = Instance.new('Frame', glow)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Settings.TracerColor
+        frame.BackgroundTransparency = 0.5
+        frame.BorderSizePixel = 0
         
-        local v15 = Instance.new('PointLight', v6)
-        v15.Color = Settings.TracerColor
-        v15.Range = 15
-        v15.Brightness = 5
-        v15.Shadows = true
-        
-        local v16 = Instance.new('Beam', v6)
-        v16.FaceCamera = true
-        v16.Color = ColorSequence.new(Settings.TracerColor)
-        v16.Width0 = 0.2
-        v16.Width1 = 0.2
-        v16.Texture = "rbxassetid://446111271"
-        v16.TextureSpeed = 1
-        v16.LightEmission = 1
-        v16.Attachment0 = v8
-        v16.Attachment1 = v9
-        
-        local v17 = 0
-        local v18 = v2.RenderStepped:Connect(function()
-            v17 = v17 + 0.1
-            v19.CFrame = v19.CFrame * CFrame.Angles(0, 0.1, 0)
-        end)
-        
-        game:GetService('Debris'):AddItem(v18, Settings.TracerDuration)
+        light = Instance.new('PointLight', tracer)
+        light.Color = Settings.TracerColor
+        light.Range = 15
+        light.Brightness = 0
+        light.Enabled = true
     end
-    
-    v6.Parent = workspace
-    v10:Play()
-    v20:Play()
-    v11:Play()
-    v21:Play()
-    game:GetService('Debris'):AddItem(v6, Settings.TracerDuration)
-    game:GetService('Debris'):AddItem(v19, Settings.TracerDuration)
+
+    local appearInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local fadeInfo = TweenInfo.new(Settings.TracerDuration - 0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.1)
+
+    local appearTween = TweenService:Create(tracer, appearInfo, {Transparency = 0.3})
+    local fadeTween = TweenService:Create(tracer, fadeInfo, {Transparency = 1})
+
+    local lightAppear, lightFade
+    if light then
+        lightAppear = TweenService:Create(light, appearInfo, {Brightness = 5})
+        lightFade = TweenService:Create(light, fadeInfo, {Brightness = 0})
+    end
+
+    appearTween:Play()
+    if lightAppear then lightAppear:Play() end
+
+    appearTween.Completed:Connect(function()
+        fadeTween:Play()
+        if lightFade then lightFade:Play() end
+    end)
+
+    game:GetService('Debris'):AddItem(tracer, Settings.TracerDuration)
 end
 local function ShowHitNotification(target)
     if not Settings.HitNotify or not target or not target.Parent then return end
