@@ -1248,159 +1248,141 @@ end)
 
 RunService.RenderStepped:Connect(UpdateSkeleton)
 --]]
-local ESPTab = Window:AddTab('Visuals')
+local ESPTab = Window:AddTab('Drawing')
 
-local LeftSettings = ESPTab:AddLeftGroupbox('Drawing')
-LeftSettings:AddToggle('EnableESP', {Text = 'Enable', Default = false})
-LeftSettings:AddToggle('ShowBox', {Text = 'Box', Default = true})
-LeftSettings:AddToggle('ShowName', {Text = 'Name', Default = true})
-LeftSettings:AddToggle('ShowHealth', {Text = 'Health', Default = true})
-LeftSettings:AddToggle('ShowDistance', {Text = 'Distance', Default = true})
-LeftSettings:AddToggle('ShowTracer', {Text = 'Tracer', Default = false})
-LeftSettings:AddSlider('MaxDistance', {Text = 'Max Distance', Default = 1000, Min = 100, Max = 5000, Rounding = 0})
+local LeftGroup = ESPTab:AddLeftGroupbox('Main')
+local EnableToggle = LeftGroup:AddToggle('ESPEnabled', {Text = 'Enable', Default = false})
 
-local RightSettings = ESPTab:AddRightGroupbox('Setting')
-RightSettings:AddLabel('Box Color'):AddColorPicker('BoxColor', {Default = Color3.new(1,0,0)})
-RightSettings:AddLabel('Text Color'):AddColorPicker('TextColor', {Default = Color3.new(1,1,1)})
-RightSettings:AddLabel('Tracer Color'):AddColorPicker('TracerColor', {Default = Color3.new(1,1,1)})
-RightSettings:AddSlider('BoxThickness', {Text = 'Box Thickness', Default = 1, Min = 1, Max = 3, Rounding = 0})
-RightSettings:AddSlider('TextSize', {Text = 'Text Size', Default = 14, Min = 8, Max = 20, Rounding = 0})
-RightSettings:AddSlider('TracerThickness', {Text = 'Tracer Thickness', Default = 1, Min = 1, Max = 3, Rounding = 0})
+local RightGroup = ESPTab:AddRightGroupbox('Settings')
+local BoxToggle = RightGroup:AddToggle('ShowBox', {Text = 'Show Box', Default = true})
+local NameToggle = RightGroup:AddToggle('ShowName', {Text = 'Show Name', Default = true})
+local BoxColor = RightGroup:AddLabel('Box Color'):AddColorPicker('BoxColor', {Default = Color3.new(1,0,0)})
+local TextColor = RightGroup:AddLabel('Text Color'):AddColorPicker('TextColor', {Default = Color3.new(1,1,1)})
+local ThicknessSlider = RightGroup:AddSlider('BoxThickness', {Text = 'Box Thickness', Default = 1, Min = 1, Max = 3, Rounding = 0})
+local TextSizeSlider = RightGroup:AddSlider('TextSize', {Text = 'Text Size', Default = 14, Min = 8, Max = 20, Rounding = 0})
+local DistanceSlider = RightGroup:AddSlider('MaxDistance', {Text = 'Max Distance', Default = 1000, Min = 100, Max = 5000, Rounding = 0})
 
-local ESP = {
-    Drawings = {},
-    Connections = {}
+local ESPData = {
+    Active = false,
+    BoxVisible = true,
+    NameVisible = true,
+    BoxColor = Color3.new(1,0,0),
+    TextColor = Color3.new(1,1,1),
+    BoxThickness = 1,
+    TextSize = 14,
+    MaxDistance = 1000
 }
-local function CreateESP(player)
-    local drawings = {
-        Box = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
-        Health = Drawing.new("Text"),
-        Distance = Drawing.new("Text"),
-        Tracer = Drawing.new("Line")
-    }
 
-    drawings.Box.Visible = false
-    drawings.Box.Filled = false
-    drawings.Box.Thickness = 1
-    drawings.Box.ZIndex = 1
+local PlayerDrawings = {}
 
-    drawings.Name.Visible = false
-    drawings.Name.Outline = true
-    drawings.Name.Size = 14
-    drawings.Name.ZIndex = 2
-
-    drawings.Health.Visible = false
-    drawings.Health.Outline = true
-    drawings.Health.Size = 14
-    drawings.Health.ZIndex = 2
-
-    drawings.Distance.Visible = false
-    drawings.Distance.Outline = true
-    drawings.Distance.Size = 14
-    drawings.Distance.ZIndex = 2
-
-    drawings.Tracer.Visible = false
-    drawings.Tracer.Thickness = 1
-    drawings.Tracer.ZIndex = 1
-
-    ESP.Drawings[player] = drawings
-    return drawings
+local function UpdateSettings()
+    ESPData.Active = EnableToggle.Value
+    ESPData.BoxVisible = BoxToggle.Value
+    ESPData.NameVisible = NameToggle.Value
+    ESPData.BoxColor = BoxColor.Value
+    ESPData.TextColor = TextColor.Value
+    ESPData.BoxThickness = ThicknessSlider.Value
+    ESPData.TextSize = TextSizeSlider.Value
+    ESPData.MaxDistance = DistanceSlider.Value
 end
 
-local function UpdateESP()
-    for player, drawings in pairs(ESP.Drawings) do
-        if player and player.Character and Settings.EnableESP then
-            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+local function CreateESP(player)
+    if PlayerDrawings[player] then return end
 
-            if rootPart and humanoid and humanoid.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
-                
-                if onScreen and distance <= Settings.MaxDistance then
+    local drawings = {
+        Box = Drawing.new('Square'),
+        Name = Drawing.new('Text'),
+        Character = nil,
+        Humanoid = nil
+    }
+
+    PlayerDrawings[player] = drawings
+
+    local function SetupCharacter(character)
+        drawings.Character = character
+        drawings.Humanoid = character:WaitForChild('Humanoid')
+    end
+
+    if player.Character then
+        SetupCharacter(player.Character)
+    end
+
+    player.CharacterAdded:Connect(SetupCharacter)
+end
+
+local function RemoveESP(player)
+    if not PlayerDrawings[player] then return end
+
+    for _, drawing in pairs(PlayerDrawings[player]) do
+        if typeof(drawing) == 'Drawing' then
+            drawing:Remove()
+        end
+    end
+
+    PlayerDrawings[player] = nil
+end
+
+local function UpdateDrawings()
+    if not ESPData.Active then
+        for _, drawings in pairs(PlayerDrawings) do
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
+        end
+        return
+    end
+
+    for player, drawings in pairs(PlayerDrawings) do
+        if drawings.Character and drawings.Humanoid and drawings.Humanoid.Health > 0 then
+            local rootPart = drawings.Character:FindFirstChild('HumanoidRootPart')
+            if rootPart then
+                local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(rootPart.Position)
+                local distance = (rootPart.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
+
+                if onScreen and distance <= ESPData.MaxDistance then
                     local boxSize = Vector2.new(2000 / distance, 3000 / distance)
                     local boxPos = Vector2.new(screenPos.X - boxSize.X/2, screenPos.Y - boxSize.Y/2)
 
-                    drawings.Box.Visible = Settings.ShowBox
-                    drawings.Box.Position = boxPos
-                    drawings.Box.Size = boxSize
-                    drawings.Box.Color = Settings.BoxColor
-                    drawings.Box.Thickness = Settings.BoxThickness
+                    drawings.Box.Visible = ESPData.BoxVisible
+                    if ESPData.BoxVisible then
+                        drawings.Box.Position = boxPos
+                        drawings.Box.Size = boxSize
+                        drawings.Box.Color = ESPData.BoxColor
+                        drawings.Box.Thickness = ESPData.BoxThickness
+                        drawings.Box.Filled = false
+                    end
 
-                    drawings.Name.Visible = Settings.ShowName
-                    drawings.Name.Position = Vector2.new(screenPos.X, boxPos.Y - 20)
-                    drawings.Name.Text = player.Name
-                    drawings.Name.Color = Settings.TextColor
-                    drawings.Name.Size = Settings.TextSize
-
-                    drawings.Health.Visible = Settings.ShowHealth
-                    drawings.Health.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 5)
-                    drawings.Health.Text = math.floor(humanoid.Health).."/"..math.floor(humanoid.MaxHealth)
-                    drawings.Health.Color = Settings.TextColor
-                    drawings.Health.Size = Settings.TextSize
-
-                    drawings.Distance.Visible = Settings.ShowDistance
-                    drawings.Distance.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 25)
-                    drawings.Distance.Text = math.floor(distance).." studs"
-                    drawings.Distance.Color = Settings.TextColor
-                    drawings.Distance.Size = Settings.TextSize
-
-                    drawings.Tracer.Visible = Settings.ShowTracer
-                    drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                    drawings.Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                    drawings.Tracer.Color = Settings.TracerColor
-                    drawings.Tracer.Thickness = Settings.TracerThickness
+                    drawings.Name.Visible = ESPData.NameVisible
+                    if ESPData.NameVisible then
+                        drawings.Name.Position = Vector2.new(screenPos.X, boxPos.Y - 20)
+                        drawings.Name.Text = player.Name
+                        drawings.Name.Color = ESPData.TextColor
+                        drawings.Name.Size = ESPData.TextSize
+                        drawings.Name.Outline = true
+                    end
                 else
                     drawings.Box.Visible = false
                     drawings.Name.Visible = false
-                    drawings.Health.Visible = false
-                    drawings.Distance.Visible = false
-                    drawings.Tracer.Visible = false
                 end
-            else
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-                drawings.Health.Visible = false
-                drawings.Distance.Visible = false
-                drawings.Tracer.Visible = false
             end
         else
             drawings.Box.Visible = false
             drawings.Name.Visible = false
-            drawings.Health.Visible = false
-            drawings.Distance.Visible = false
-            drawings.Tracer.Visible = false
         end
     end
 end
 
-local function ClearESP()
-    for _, drawings in pairs(ESP.Drawings) do
-        for _, drawing in pairs(drawings) do
-            drawing:Remove()
-        end
-    end
-    ESP.Drawings = {}
-end
+game:GetService('Players').PlayerAdded:Connect(CreateESP)
+game:GetService('Players').PlayerRemoving:Connect(RemoveESP)
 
-for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
+for _, player in pairs(game:GetService('Players'):GetPlayers()) do
+    if player ~= game.Players.LocalPlayer then
         CreateESP(player)
     end
 end
 
-Players.PlayerAdded:Connect(function(player)
-    CreateESP(player)
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    if ESP.Drawings[player] then
-        for _, drawing in pairs(ESP.Drawings[player]) do
-            drawing:Remove()
-        end
-        ESP.Drawings[player] = nil
-    end
+game:GetService('RunService').RenderStepped:Connect(function()
+    UpdateSettings()
+    UpdateDrawings()
 end)
 
 RunService.RenderStepped:Connect(UpdateESP)
