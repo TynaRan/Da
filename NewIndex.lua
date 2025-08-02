@@ -35,6 +35,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     Main = Window:AddTab('Main'),
+    Visuals = Window:AddTab('Visuals'),
     Settings = Window:AddTab('UI Settings')
 }
 
@@ -899,6 +900,219 @@ RunService.RenderStepped:Connect(function(deltaTime)
     FOVCircle.Visible = Settings.ShowFOV
     FOVCircle.Radius = Settings.FOV
 end)
+local ESPGroup = Tabs.Visuals:AddRightGroupbox('ESP Settings')
+ESPGroup:AddToggle('EnableESP', {Text = 'Enable ESP', Default = false})
+ESPGroup:AddToggle('ShowNames', {Text = 'Names', Default = true})
+ESPGroup:AddToggle('ShowBoxes', {Text = 'Boxes', Default = true})
+ESPGroup:AddToggle('ShowTracers', {Text = 'Tracers', Default = true})
+ESPGroup:AddToggle('ShowHealth', {Text = 'Health', Default = true})
+ESPGroup:AddToggle('ShowDistance', {Text = 'Distance', Default = true})
+ESPGroup:AddToggle('ShowWeapon', {Text = 'Item', Default = true})
+--ESPGroup:AddToggle('ShowSkeleton', {Text = 'Skeleton', Default = false})
+ESPGroup:AddToggle('ShowFilled', {Text = 'Filled', Default = false})
+ESPGroup:AddToggle('ShowOutOfView', {Text = 'OOV Arrows', Default = true})
+
+local ColorsGroup = Tabs.Visuals:AddRightGroupbox('Colors')
+ColorsGroup:AddLabel('Box Color'):AddColorPicker('BoxColor', {Default = Color3.new(1,0,0)})
+ColorsGroup:AddLabel('Name Color'):AddColorPicker('NameColor', {Default = Color3.new(1,1,1)})
+ColorsGroup:AddLabel('Tracer Color'):AddColorPicker('TracerColor', {Default = Color3.new(1,1,1)})
+ColorsGroup:AddLabel('Health Color'):AddColorPicker('HealthColor', {Default = Color3.new(0,1,0)})
+ColorsGroup:AddLabel('Distance Color'):AddColorPicker('DistanceColor', {Default = Color3.new(1,1,1)})
+ColorsGroup:AddLabel('Weapon Color'):AddColorPicker('WeaponColor', {Default = Color3.new(1,0.5,0)})
+--ColorsGroup:AddLabel('Skeleton Color'):AddColorPicker('SkeletonColor', {Default = Color3.new(1,1,1)})
+ColorsGroup:AddLabel('OOV Color'):AddColorPicker('OOVColor', {Default = Color3.new(1,0,0)})
+
+local SettingsGroup = Tabs.Visuals:AddRightGroupbox('Settings')
+SettingsGroup:AddSlider('TextSize', {Text = 'Text Size', Default = 14, Min = 8, Max = 24, Rounding = 0})
+SettingsGroup:AddSlider('BoxTransparency', {Text = 'Box Transparency', Default = 0, Min = 0, Max = 1, Rounding = 2})
+SettingsGroup:AddSlider('TracerThickness', {Text = 'Tracer Thickness', Default = 1, Min = 1, Max = 5, Rounding = 0})
+SettingsGroup:AddSlider('ArrowSize', {Text = 'Arrow Size', Default = 15, Min = 5, Max = 30, Rounding = 0})
+SettingsGroup:AddSlider('MaxDistance', {Text = 'Max Distance', Default = 1000, Min = 100, Max = 5000, Rounding = 0})
+
+local ESP = {
+    Objects = {},
+    Connections = {},
+    Drawings = {}
+}
+
+local function CreateESP(player)
+    local drawings = {
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Health = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        Weapon = Drawing.new("Text"),
+        Tracer = Drawing.new("Line"),
+        OOVArrow = Drawing.new("Triangle")
+    }
+
+    drawings.Box.Visible = false
+    drawings.Name.Visible = false
+    drawings.Health.Visible = false
+    drawings.Distance.Visible = false
+    drawings.Weapon.Visible = false
+    drawings.Tracer.Visible = false
+    drawings.OOVArrow.Visible = false
+
+    drawings.Box.Thickness = 1
+    drawings.Tracer.Thickness = 1
+    drawings.Name.Size = 14
+    drawings.Health.Size = 14
+    drawings.Distance.Size = 14
+    drawings.Weapon.Size = 14
+
+    ESP.Drawings[player] = drawings
+
+    local connection
+    connection = player.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        ESP.Drawings[player].Character = character
+    end)
+
+    table.insert(ESP.Connections, connection)
+end
+
+local function UpdateESP()
+    for player, drawings in pairs(ESP.Drawings) do
+        if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = player.Character.HumanoidRootPart
+            local head = player.Character:FindFirstChild("Head")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+
+            if rootPart and head and humanoid then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+
+                if distance <= Settings.MaxDistance then
+                    if onScreen then
+                        local boxSize = Vector2.new(2000 / distance, 3000 / distance)
+                        local boxPos = Vector2.new(screenPos.X - boxSize.X / 2, screenPos.Y - boxSize.Y / 2)
+
+                        if Settings.ShowBoxes then
+                            drawings.Box.Visible = true
+                            drawings.Box.Position = boxPos
+                            drawings.Box.Size = boxSize
+                            drawings.Box.Color = Settings.BoxColor
+                            drawings.Box.Transparency = Settings.BoxTransparency
+                            drawings.Box.Filled = Settings.ShowFilled
+                        else
+                            drawings.Box.Visible = false
+                        end
+
+                        if Settings.ShowNames then
+                            drawings.Name.Visible = true
+                            drawings.Name.Position = Vector2.new(screenPos.X, boxPos.Y - 20)
+                            drawings.Name.Text = player.Name
+                            drawings.Name.Color = Settings.NameColor
+                            drawings.Name.Size = Settings.TextSize
+                        else
+                            drawings.Name.Visible = false
+                        end
+
+                        if Settings.ShowHealth then
+                            drawings.Health.Visible = true
+                            drawings.Health.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 5)
+                            drawings.Health.Text = "HP: "..math.floor(humanoid.Health).."/"..math.floor(humanoid.MaxHealth)
+                            drawings.Health.Color = Settings.HealthColor
+                            drawings.Health.Size = Settings.TextSize
+                        else
+                            drawings.Health.Visible = false
+                        end
+
+                        if Settings.ShowDistance then
+                            drawings.Distance.Visible = true
+                            drawings.Distance.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 25)
+                            drawings.Distance.Text = math.floor(distance).." studs"
+                            drawings.Distance.Color = Settings.DistanceColor
+                            drawings.Distance.Size = Settings.TextSize
+                        else
+                            drawings.Distance.Visible = false
+                        end
+
+                        if Settings.ShowTracers then
+                            drawings.Tracer.Visible = true
+                            drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                            drawings.Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+                            drawings.Tracer.Color = Settings.TracerColor
+                            drawings.Tracer.Thickness = Settings.TracerThickness
+                        else
+                            drawings.Tracer.Visible = false
+                        end
+
+                        if Settings.ShowWeapon then
+                            local weapon = "None"
+                            for _, tool in pairs(player.Character:GetChildren()) do
+                                if tool:IsA("Tool") then
+                                    weapon = tool.Name
+                                    break
+                                end
+                            end
+                            drawings.Weapon.Visible = true
+                            drawings.Weapon.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 45)
+                            drawings.Weapon.Text = weapon
+                            drawings.Weapon.Color = Settings.WeaponColor
+                            drawings.Weapon.Size = Settings.TextSize
+                        else
+                            drawings.Weapon.Visible = false
+                        end
+
+                        drawings.OOVArrow.Visible = false
+                    elseif Settings.ShowOutOfView then
+                        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                        local dir = (Vector2.new(screenPos.X, screenPos.Y) - center
+                        local angle = math.atan2(dir.Y, dir.X)
+                        local arrowSize = Settings.ArrowSize
+
+                        drawings.OOVArrow.Visible = true
+                        drawings.OOVArrow.PointA = center + Vector2.new(math.cos(angle) * arrowSize, math.sin(angle) * arrowSize)
+                        drawings.OOVArrow.PointB = center + Vector2.new(math.cos(angle + 0.5) * arrowSize/2, math.sin(angle + 0.5) * arrowSize/2)
+                        drawings.OOVArrow.PointC = center + Vector2.new(math.cos(angle - 0.5) * arrowSize/2, math.sin(angle - 0.5) * arrowSize/2)
+                        drawings.OOVArrow.Color = Settings.OOVColor
+                        drawings.OOVArrow.Filled = true
+                    end
+                else
+                    for _, drawing in pairs(drawings) do
+                        drawing.Visible = false
+                    end
+                end
+            end
+        else
+            for _, drawing in pairs(drawings) do
+                drawing.Visible = false
+            end
+        end
+    end
+end
+
+local function ClearAllESP()
+    for _, drawings in pairs(ESP.Drawings) do
+        for _, drawing in pairs(drawings) do
+            drawing:Remove()
+        end
+    end
+    ESP.Drawings = {}
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    CreateESP(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if ESP.Drawings[player] then
+        for _, drawing in pairs(ESP.Drawings[player]) do
+            drawing:Remove()
+        end
+        ESP.Drawings[player] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(UpdateESP)
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
