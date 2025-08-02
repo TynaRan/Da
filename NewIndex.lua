@@ -584,11 +584,10 @@ local function CreateRichTracer(startPos, endPos)
     local Debris = game:GetService("Debris")
     local RunService = game:GetService("RunService")
 
-    local direction = (endPos - startPos).Unit
     local distance = (startPos - endPos).Magnitude
-    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, math.clamp(distance * 0.1, 0, 5), 0)
+    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, math.clamp(distance * 0.05, 0, 3), 0)
 
-    local tracer = Instance.new("Part")
+    local tracer = Instance.new('Part')
     tracer.Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, 0)
     tracer.CFrame = CFrame.lookAt(startPos, endPos)
     tracer.Anchored = true
@@ -598,93 +597,68 @@ local function CreateRichTracer(startPos, endPos)
     tracer.Transparency = 1
     tracer.Parent = workspace
 
-    local trail = Instance.new("Trail")
-    trail.Attachment0 = Instance.new("Attachment", tracer)
-    trail.Attachment1 = Instance.new("Attachment", tracer)
-    trail.Attachment1.Position = Vector3.new(0, 0, -0.1)
-    trail.Color = ColorSequence.new(Settings.TracerColor)
-    trail.LightEmission = 0.8
-    trail.Transparency = NumberSequence.new(1)
-    trail.Lifetime = Settings.TracerDuration * 0.5
-    trail.MinLength = 0.05
-    trail.Parent = tracer
+    local bulletHead = Instance.new("Part")
+    bulletHead.Shape = Enum.PartType.Ball
+    bulletHead.Size = Vector3.new(0.2, 0.2, 0.2)
+    bulletHead.CFrame = CFrame.new(startPos)
+    bulletHead.Anchored = true
+    bulletHead.CanCollide = false
+    bulletHead.Material = Enum.Material.Neon
+    bulletHead.Color = Settings.TracerColor
+    bulletHead.Transparency = 1
+    bulletHead.Parent = workspace
 
-    local mesh = Instance.new("SpecialMesh", tracer)
-    mesh.MeshType = Enum.MeshType.Cylinder
-    mesh.Scale = Vector3.new(1, 1, 0)
+    local shockwave = Instance.new("Part")
+    shockwave.Shape = Enum.PartType.Ball
+    shockwave.Size = Vector3.new(0.5, 0.5, 0.5)
+    shockwave.CFrame = CFrame.new(endPos)
+    shockwave.Anchored = true
+    shockwave.CanCollide = false
+    shockwave.Material = Enum.Material.Neon
+    shockwave.Color = Settings.TracerColor
+    shockwave.Transparency = 1
+    shockwave.Parent = workspace
 
-    local appearDuration = Settings.TracerDuration * 0.2
-    local sustainDuration = Settings.TracerDuration * 0.3
-    local fadeDuration = Settings.TracerDuration * 0.5
-
-    local appearTween = TweenService:Create(tracer, TweenInfo.new(appearDuration, Enum.EasingStyle.Quint), {
-        Transparency = 0.2,
-        Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, distance)
+    local tracerAppear = TweenService:Create(tracer, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, distance),
+        Transparency = 0.3,
+        CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance/2)
     })
 
-    local meshTween = TweenService:Create(mesh, TweenInfo.new(appearDuration, Enum.EasingStyle.Quint), {
-        Scale = Vector3.new(1, 1, distance * 10)
+    local tracerDisappear = TweenService:Create(tracer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = Vector3.new(Settings.TracerWidth * 1.5, Settings.TracerWidth * 1.5, 0),
+        Transparency = 1
     })
 
-    local fadeTween = TweenService:Create(tracer, TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad), {
-        Transparency = 1,
-        Size = Vector3.new(0, 0, distance * 1.5)
+    local bulletFly = TweenService:Create(bulletHead, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {
+        CFrame = CFrame.new(endPos),
+        Transparency = 0
     })
 
-    local function UpdateTrailTransparency(alpha)
-        trail.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, alpha),
-            NumberSequenceKeypoint.new(1, math.min(alpha + 0.3, 1))
-        })
-    end
+    local shockwaveExpand = TweenService:Create(shockwave, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(8, 8, 8),
+        Transparency = 0.8
+    })
 
-    if Settings.RichBullet then
-        local sparkles = Instance.new("ParticleEmitter", tracer)
-        sparkles.Texture = "rbxassetid://296874871"
-        sparkles.Color = ColorSequence.new(Settings.TracerColor)
-        sparkles.Size = NumberSequence.new(0.3)
-        sparkles.LightEmission = 0.9
-        sparkles.Speed = NumberRange.new(3)
-        sparkles.Lifetime = NumberRange.new(Settings.TracerDuration * 0.4)
-        sparkles.Rate = 100
-        sparkles.EmissionDirection = Enum.NormalId.Front
-        sparkles.Enabled = false
+    local shockwaveFade = TweenService:Create(shockwave, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Transparency = 1
+    })
 
-        local impactGlow = Instance.new("SurfaceGui", tracer)
-        impactGlow.Face = Enum.NormalId.Front
-        impactGlow.Adornee = tracer
-        impactGlow.LightInfluence = 0
-        local frame = Instance.new("Frame", impactGlow)
-        frame.Size = UDim2.new(1, 0, 1, 0)
-        frame.BackgroundColor3 = Settings.TracerColor
-        frame.BackgroundTransparency = 0.8
-        frame.BorderSizePixel = 0
+    tracerAppear:Play()
+    bulletFly:Play()
+    
+    delay(0.3, function()
+        shockwaveExpand:Play()
+        shockwaveFade:Play()
+    end)
 
-        appearTween.Completed:Connect(function()
-            sparkles.Enabled = true
-            delay(sustainDuration, function()
-                local sparkleFade = TweenService:Create(sparkles, TweenInfo.new(fadeDuration * 0.5), {
-                    Rate = 0,
-                    Lifetime = NumberRange.new(Settings.TracerDuration * 0.1)
-                })
-                sparkleFade:Play()
-            end)
-        end)
-    end
-
-    appearTween:Play()
-    meshTween:Play()
-    UpdateTrailTransparency(0.2)
-
-    delay(appearDuration + sustainDuration, function()
-        fadeTween:Play()
-        for t = 0.2, 1, 0.8/(fadeDuration*60) do
-            UpdateTrailTransparency(t)
-            RunService.Heartbeat:Wait()
-        end
+    delay(Settings.TracerDuration - 0.3, function()
+        tracerDisappear:Play()
     end)
 
     Debris:AddItem(tracer, Settings.TracerDuration)
+    Debris:AddItem(bulletHead, 0.5)
+    Debris:AddItem(shockwave, 0.6)
 end
 local function ShowHitNotification(target)
     if not Settings.HitNotify or not target or not target.Parent then return end
