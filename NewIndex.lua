@@ -1271,7 +1271,6 @@ local ESP = {
     Drawings = {},
     Connections = {}
 }
-
 local function CreateESP(player)
     local drawings = {
         Box = Drawing.new("Square"),
@@ -1282,19 +1281,31 @@ local function CreateESP(player)
     }
 
     drawings.Box.Visible = false
+    drawings.Box.Filled = false
+    drawings.Box.Thickness = 1
+    drawings.Box.ZIndex = 1
+
     drawings.Name.Visible = false
+    drawings.Name.Outline = true
+    drawings.Name.Size = 14
+    drawings.Name.ZIndex = 2
+
     drawings.Health.Visible = false
+    drawings.Health.Outline = true
+    drawings.Health.Size = 14
+    drawings.Health.ZIndex = 2
+
     drawings.Distance.Visible = false
+    drawings.Distance.Outline = true
+    drawings.Distance.Size = 14
+    drawings.Distance.ZIndex = 2
+
     drawings.Tracer.Visible = false
+    drawings.Tracer.Thickness = 1
+    drawings.Tracer.ZIndex = 1
 
     ESP.Drawings[player] = drawings
-
-    local connection
-    connection = player.CharacterAdded:Connect(function(character)
-        task.wait(0.5)
-        ESP.Drawings[player].Character = character
-    end)
-    table.insert(ESP.Connections, connection)
+    return drawings
 end
 
 local function UpdateESP()
@@ -1311,73 +1322,55 @@ local function UpdateESP()
                     local boxSize = Vector2.new(2000 / distance, 3000 / distance)
                     local boxPos = Vector2.new(screenPos.X - boxSize.X/2, screenPos.Y - boxSize.Y/2)
 
-                    if Settings.ShowBox then
-                        drawings.Box.Visible = true
-                        drawings.Box.Position = boxPos
-                        drawings.Box.Size = boxSize
-                        drawings.Box.Color = Settings.BoxColor
-                        drawings.Box.Thickness = Settings.BoxThickness
-                        drawings.Box.Filled = false
-                    else
-                        drawings.Box.Visible = false
-                    end
+                    drawings.Box.Visible = Settings.ShowBox
+                    drawings.Box.Position = boxPos
+                    drawings.Box.Size = boxSize
+                    drawings.Box.Color = Settings.BoxColor
+                    drawings.Box.Thickness = Settings.BoxThickness
 
-                    if Settings.ShowName then
-                        drawings.Name.Visible = true
-                        drawings.Name.Position = Vector2.new(screenPos.X, boxPos.Y - 20)
-                        drawings.Name.Text = player.Name
-                        drawings.Name.Color = Settings.TextColor
-                        drawings.Name.Size = Settings.TextSize
-                        drawings.Name.Outline = true
-                    else
-                        drawings.Name.Visible = false
-                    end
+                    drawings.Name.Visible = Settings.ShowName
+                    drawings.Name.Position = Vector2.new(screenPos.X, boxPos.Y - 20)
+                    drawings.Name.Text = player.Name
+                    drawings.Name.Color = Settings.TextColor
+                    drawings.Name.Size = Settings.TextSize
 
-                    if Settings.ShowHealth then
-                        drawings.Health.Visible = true
-                        drawings.Health.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 5)
-                        drawings.Health.Text = math.floor(humanoid.Health).."/"..math.floor(humanoid.MaxHealth)
-                        drawings.Health.Color = Settings.TextColor
-                        drawings.Health.Size = Settings.TextSize
-                        drawings.Health.Outline = true
-                    else
-                        drawings.Health.Visible = false
-                    end
+                    drawings.Health.Visible = Settings.ShowHealth
+                    drawings.Health.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 5)
+                    drawings.Health.Text = math.floor(humanoid.Health).."/"..math.floor(humanoid.MaxHealth)
+                    drawings.Health.Color = Settings.TextColor
+                    drawings.Health.Size = Settings.TextSize
 
-                    if Settings.ShowDistance then
-                        drawings.Distance.Visible = true
-                        drawings.Distance.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 25)
-                        drawings.Distance.Text = math.floor(distance).." studs"
-                        drawings.Distance.Color = Settings.TextColor
-                        drawings.Distance.Size = Settings.TextSize
-                        drawings.Distance.Outline = true
-                    else
-                        drawings.Distance.Visible = false
-                    end
+                    drawings.Distance.Visible = Settings.ShowDistance
+                    drawings.Distance.Position = Vector2.new(screenPos.X, boxPos.Y + boxSize.Y + 25)
+                    drawings.Distance.Text = math.floor(distance).." studs"
+                    drawings.Distance.Color = Settings.TextColor
+                    drawings.Distance.Size = Settings.TextSize
 
-                    if Settings.ShowTracer then
-                        drawings.Tracer.Visible = true
-                        drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                        drawings.Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                        drawings.Tracer.Color = Settings.TracerColor
-                        drawings.Tracer.Thickness = Settings.TracerThickness
-                    else
-                        drawings.Tracer.Visible = false
-                    end
+                    drawings.Tracer.Visible = Settings.ShowTracer
+                    drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                    drawings.Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+                    drawings.Tracer.Color = Settings.TracerColor
+                    drawings.Tracer.Thickness = Settings.TracerThickness
                 else
-                    for _, drawing in pairs(drawings) do
-                        drawing.Visible = false
-                    end
+                    drawings.Box.Visible = false
+                    drawings.Name.Visible = false
+                    drawings.Health.Visible = false
+                    drawings.Distance.Visible = false
+                    drawings.Tracer.Visible = false
                 end
             else
-                for _, drawing in pairs(drawings) do
-                    drawing.Visible = false
-                end
+                drawings.Box.Visible = false
+                drawings.Name.Visible = false
+                drawings.Health.Visible = false
+                drawings.Distance.Visible = false
+                drawings.Tracer.Visible = false
             end
         else
-            for _, drawing in pairs(drawings) do
-                drawing.Visible = false
-            end
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
+            drawings.Health.Visible = false
+            drawings.Distance.Visible = false
+            drawings.Tracer.Visible = false
         end
     end
 end
