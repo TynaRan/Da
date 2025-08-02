@@ -667,12 +667,18 @@ local function ShowHitNotification(target)
     if not player then return end
     
     local name = player.DisplayName or player.Name
-    local userId = player.UserId
     local distance = math.floor((target.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)
     local hitPart = target.Name
     local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
     local health = humanoid and string.format("%d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)) or "N/A"
-    local currentWeapon = GetCurrentWeapon() or "Unknown"
+    
+    local currentItem = "None"
+    if LocalPlayer.Character then
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            currentItem = tool.Name
+        end
+    end
     
     local gunHitSound = Instance.new("Sound")
     gunHitSound.SoundId = "rbxassetid://4817809188"
@@ -680,9 +686,8 @@ local function ShowHitNotification(target)
     gunHitSound.Parent = workspace
     gunHitSound:Play()
     
-    Library:Notify(string.format("Hit %s [%s] | Distance %d | Health %s | Item: %s", name, hitPart, distance, health, currentWeapon))
+    Library:Notify(string.format("Hit %s [%s] | Distance %d | Health %s | Item: %s", name, hitPart, distance, health, currentItem))
 end
-
 Settings.RichShader = false
 Settings.BloomIntensity = 1
 Settings.BloomSize = 8
