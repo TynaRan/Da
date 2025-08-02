@@ -431,6 +431,7 @@ local function CreateRichTracer(startPos, endPos)
     Debris:AddItem(tracer, totalDuration)
 end
 --]]
+--[[
 local function CreateRichTracer(startPos, endPos)
     if not Settings.BulletTracers then return end
 
@@ -574,6 +575,116 @@ local function CreateRichTracer(startPos, endPos)
     end)
 
     Debris:AddItem(tracer, totalDuration)
+end
+--]]
+local function CreateRichTracer(startPos, endPos)
+    if not Settings.BulletTracers then return end
+
+    local TweenService = game:GetService("TweenService")
+    local Debris = game:GetService("Debris")
+    local RunService = game:GetService("RunService")
+
+    local direction = (endPos - startPos).Unit
+    local distance = (startPos - endPos).Magnitude
+    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, math.clamp(distance * 0.1, 0, 5), 0)
+
+    local tracer = Instance.new("Part")
+    tracer.Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, 0)
+    tracer.CFrame = CFrame.lookAt(startPos, endPos)
+    tracer.Anchored = true
+    tracer.CanCollide = false
+    tracer.Material = Enum.Material.Neon
+    tracer.Color = Settings.TracerColor
+    tracer.Transparency = 1
+    tracer.Parent = workspace
+
+    local trail = Instance.new("Trail")
+    trail.Attachment0 = Instance.new("Attachment", tracer)
+    trail.Attachment1 = Instance.new("Attachment", tracer)
+    trail.Attachment1.Position = Vector3.new(0, 0, -0.1)
+    trail.Color = ColorSequence.new(Settings.TracerColor)
+    trail.LightEmission = 0.8
+    trail.Transparency = NumberSequence.new(1)
+    trail.Lifetime = Settings.TracerDuration * 0.5
+    trail.MinLength = 0.05
+    trail.Parent = tracer
+
+    local mesh = Instance.new("SpecialMesh", tracer)
+    mesh.MeshType = Enum.MeshType.Cylinder
+    mesh.Scale = Vector3.new(1, 1, 0)
+
+    local appearDuration = Settings.TracerDuration * 0.2
+    local sustainDuration = Settings.TracerDuration * 0.3
+    local fadeDuration = Settings.TracerDuration * 0.5
+
+    local appearTween = TweenService:Create(tracer, TweenInfo.new(appearDuration, Enum.EasingStyle.Quint), {
+        Transparency = 0.2,
+        Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, distance)
+    })
+
+    local meshTween = TweenService:Create(mesh, TweenInfo.new(appearDuration, Enum.EasingStyle.Quint), {
+        Scale = Vector3.new(1, 1, distance * 10)
+    })
+
+    local fadeTween = TweenService:Create(tracer, TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad), {
+        Transparency = 1,
+        Size = Vector3.new(0, 0, distance * 1.5)
+    })
+
+    local function UpdateTrailTransparency(alpha)
+        trail.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, alpha),
+            NumberSequenceKeypoint.new(1, math.min(alpha + 0.3, 1))
+        })
+    end
+
+    if Settings.RichBullet then
+        local sparkles = Instance.new("ParticleEmitter", tracer)
+        sparkles.Texture = "rbxassetid://296874871"
+        sparkles.Color = ColorSequence.new(Settings.TracerColor)
+        sparkles.Size = NumberSequence.new(0.3)
+        sparkles.LightEmission = 0.9
+        sparkles.Speed = NumberRange.new(3)
+        sparkles.Lifetime = NumberRange.new(Settings.TracerDuration * 0.4)
+        sparkles.Rate = 100
+        sparkles.EmissionDirection = Enum.NormalId.Front
+        sparkles.Enabled = false
+
+        local impactGlow = Instance.new("SurfaceGui", tracer)
+        impactGlow.Face = Enum.NormalId.Front
+        impactGlow.Adornee = tracer
+        impactGlow.LightInfluence = 0
+        local frame = Instance.new("Frame", impactGlow)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Settings.TracerColor
+        frame.BackgroundTransparency = 0.8
+        frame.BorderSizePixel = 0
+
+        appearTween.Completed:Connect(function()
+            sparkles.Enabled = true
+            delay(sustainDuration, function()
+                local sparkleFade = TweenService:Create(sparkles, TweenInfo.new(fadeDuration * 0.5), {
+                    Rate = 0,
+                    Lifetime = NumberRange.new(Settings.TracerDuration * 0.1)
+                })
+                sparkleFade:Play()
+            end)
+        end)
+    end
+
+    appearTween:Play()
+    meshTween:Play()
+    UpdateTrailTransparency(0.2)
+
+    delay(appearDuration + sustainDuration, function()
+        fadeTween:Play()
+        for t = 0.2, 1, 0.8/(fadeDuration*60) do
+            UpdateTrailTransparency(t)
+            RunService.Heartbeat:Wait()
+        end
+    end)
+
+    Debris:AddItem(tracer, Settings.TracerDuration)
 end
 local function ShowHitNotification(target)
     if not Settings.HitNotify or not target or not target.Parent then return end
