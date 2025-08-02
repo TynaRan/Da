@@ -1763,7 +1763,7 @@ function ESP:Update()
         local head = character:FindFirstChild("Head")
         local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
 
-        if not head or not torso then goto continue end
+        if not head or not torso then continue end
 
         local headPos = camera:WorldToViewportPoint(head.Position)
         local torsoPos = camera:WorldToViewportPoint(torso.Position)
