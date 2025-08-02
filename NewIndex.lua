@@ -65,7 +65,7 @@ AimGroup:AddDropdown('TargetPart', {Text = 'Target Part', Values = {'Head','Huma
 
 local VisualGroup = Tabs.Main:AddRightGroupbox('Visuals')
 VisualGroup:AddToggle('ShowFOV', {Text = 'Show FOV', Default = Settings.ShowFOV, Callback = function(v) Settings.ShowFOV = v end})
-VisualGroup:AddSlider('FOV', {Text = 'FOV Size', Default = Settings.FOV, Min = 10, Max = 500, Rounding = 0, Callback = function(v) Settings.FOV = v end})
+VisualGroup:AddSlider('FOV', {Text = 'FOV Size', Default = Settings.FOV, Min = 150, Max = 1000, Rounding = 0, Callback = function(v) Settings.FOV = v end})
 VisualGroup:AddDropdown('FOVMode', {Text = 'FOV Mode', Values = {'Middle','Mouse'}, Default = 1, Callback = function(v) Settings.FOVMode = v end})
 VisualGroup:AddLabel('FOV Color'):AddColorPicker('FOVColor', {Default = Settings.FOVColor, Callback = function(v) Settings.FOVColor = v end})
 VisualGroup:AddToggle('FOVRainbow', {Text = 'Rainbow FOV', Default = Settings.FOVRainbow, Callback = function(v) Settings.FOVRainbow = v end})
@@ -900,6 +900,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
     FOVCircle.Visible = Settings.ShowFOV
     FOVCircle.Radius = Settings.FOV
 end)
+--[[
 local ESPGroup = Tabs.Visuals:AddRightGroupbox('ESP Settings')
 ESPGroup:AddToggle('EnableESP', {Text = 'Enable ESP', Default = false})
 ESPGroup:AddToggle('ShowNames', {Text = 'Names', Default = true})
@@ -1113,7 +1114,139 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 RunService.RenderStepped:Connect(UpdateESP)
+--]]
+local ESPGroup = Tabs.Visuals:AddLeftGroupbox('Skeleton ESP')
+ESPGroup:AddToggle('EnableSkeleton', {Text = 'Enable Skeleton', Default = false})
+ESPGroup:AddToggle('ShowHead', {Text = 'Show Head', Default = true})
+ESPGroup:AddToggle('ShowLimbs', {Text = 'Show Limbs', Default = true})
+ESPGroup:AddToggle('ShowTorso', {Text = 'Show Torso', Default = true})
+ESPGroup:AddSlider('Thickness', {Text = 'Line Thickness', Default = 1, Min = 1, Max = 5, Rounding = 0})
+ESPGroup:AddLabel('Bone Color'):AddColorPicker('BoneColor', {Default = Color3.new(1,1,1)})
+ESPGroup:AddSlider('MaxDistance', {Text = 'Max Distance', Default = 1000, Min = 100, Max = 5000, Rounding = 0})
 
+local Skeleton = {
+    Connections = {},
+    Drawings = {},
+    Bones = {
+        Head = {"Head", "UpperTorso"},
+        LeftArm = {"LeftUpperArm", "LeftLowerArm", "LeftHand"},
+        RightArm = {"RightUpperArm", "RightLowerArm", "RightHand"},
+        LeftLeg = {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
+        RightLeg = {"RightUpperLeg", "RightLowerLeg", "RightFoot"},
+        Torso = {"UpperTorso", "LowerTorso"}
+    }
+}
+
+local function CreateSkeleton(player)
+    local drawings = {}
+    for boneGroup, parts in pairs(Skeleton.Bones) do
+        for i = 1, #parts - 1 do
+            local line = Drawing.new("Line")
+            line.Visible = false
+            line.Thickness = 1
+            line.Color = Color3.new(1,1,1)
+            table.insert(drawings, line)
+        end
+    end
+    Skeleton.Drawings[player] = drawings
+
+    local connection
+    connection = player.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        Skeleton.Drawings[player].Character = character
+    end)
+    table.insert(Skeleton.Connections, connection)
+end
+
+local function UpdateSkeleton()
+    for player, drawings in pairs(Skeleton.Drawings) do
+        if player and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+            if humanoid and humanoid.Health > 0 and rootPart then
+                local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+                if distance <= Settings.MaxDistance then
+                    local lineIndex = 1
+                    
+                    for boneGroup, parts in pairs(Skeleton.Bones) do
+                        if (boneGroup == "Head" and Settings.ShowHead) or
+                           (boneGroup:find("Arm") and Settings.ShowLimbs) or
+                           (boneGroup:find("Leg") and Settings.ShowLimbs) or
+                           (boneGroup == "Torso" and Settings.ShowTorso) then
+                            
+                            for i = 1, #parts - 1 do
+                                local part1 = character:FindFirstChild(parts[i])
+                                local part2 = character:FindFirstChild(parts[i+1])
+                                
+                                if part1 and part2 then
+                                    local pos1, vis1 = Camera:WorldToViewportPoint(part1.Position)
+                                    local pos2, vis2 = Camera:WorldToViewportPoint(part2.Position)
+                                    
+                                    if vis1 and vis2 then
+                                        drawings[lineIndex].From = Vector2.new(pos1.X, pos1.Y)
+                                        drawings[lineIndex].To = Vector2.new(pos2.X, pos2.Y)
+                                        drawings[lineIndex].Color = Settings.BoneColor
+                                        drawings[lineIndex].Thickness = Settings.Thickness
+                                        drawings[lineIndex].Visible = true
+                                        lineIndex = lineIndex + 1
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    for i = lineIndex, #drawings do
+                        drawings[i].Visible = false
+                    end
+                else
+                    for _, line in pairs(drawings) do
+                        line.Visible = false
+                    end
+                end
+            else
+                for _, line in pairs(drawings) do
+                    line.Visible = false
+                end
+            end
+        else
+            for _, line in pairs(drawings) do
+                line.Visible = false
+            end
+        end
+    end
+end
+
+local function ClearSkeleton()
+    for _, drawings in pairs(Skeleton.Drawings) do
+        for _, line in pairs(drawings) do
+            line:Remove()
+        end
+    end
+    Skeleton.Drawings = {}
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        CreateSkeleton(player)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    CreateSkeleton(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if Skeleton.Drawings[player] then
+        for _, line in pairs(Skeleton.Drawings[player]) do
+            line:Remove()
+        end
+        Skeleton.Drawings[player] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(UpdateSkeleton)
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
