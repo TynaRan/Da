@@ -1248,6 +1248,7 @@ end)
 
 RunService.RenderStepped:Connect(UpdateSkeleton)
 --]]
+--[[
 local ESPTab = Window:AddTab('Drawing')
 
 local LeftGroup = ESPTab:AddLeftGroupbox('Main')
@@ -1386,6 +1387,216 @@ game:GetService('RunService').RenderStepped:Connect(function()
 end)
 
 RunService.RenderStepped:Connect(UpdateESP)
+--]]
+local ESPLib = {
+    Objects = {},
+    Enabled = false,
+    Settings = {
+        Box = true,
+        Name = true,
+        Health = true,
+        Distance = true,
+        TeamCheck = false,
+        Color = Color3.new(1, 0, 0),
+        MaxDistance = 1000,
+        RefreshRate = 100,
+        Transparency = 0
+    }
+}
+
+function ESPLib:Init()
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if not self.Enabled then return end
+        self:Update()
+    end)
+end
+
+function ESPLib:Toggle(state)
+    self.Enabled = state
+    if not state then
+        self:Clear()
+    end
+end
+
+function ESPLib:Clear()
+    for _, obj in pairs(self.Objects) do
+        for _, drawing in pairs(obj) do
+            drawing:Remove()
+        end
+    end
+    self.Objects = {}
+end
+
+function ESPLib:Update()
+    local camera = workspace.CurrentCamera
+    local localPlayer = game:GetService("Players").LocalPlayer
+    
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player == localPlayer then continue end
+        if not player.Character then continue end
+        if not player.Character:FindFirstChild("HumanoidRootPart") then continue end
+        if self.Settings.TeamCheck and player.Team == localPlayer.Team then continue end
+
+        local rootPart = player.Character.HumanoidRootPart
+        local distance = (rootPart.Position - camera.CFrame.Position).Magnitude
+        if distance > self.Settings.MaxDistance then continue end
+
+        local screenPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+        if not onScreen then continue end
+
+        if not self.Objects[player] then
+            self.Objects[player] = {
+                Box = Drawing.new("Square"),
+                Name = Drawing.new("Text"),
+                Health = Drawing.new("Text"),
+                Distance = Drawing.new("Text")
+            }
+        end
+
+        local esp = self.Objects[player]
+        
+        if self.Settings.Box then
+            esp.Box.Visible = true
+            esp.Box.Color = self.Settings.Color
+            esp.Box.Thickness = 2
+            esp.Box.Size = Vector2.new(100, 200)
+            esp.Box.Position = Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(50, 100)
+            esp.Box.Filled = false
+            esp.Box.Transparency = 1 - self.Settings.Transparency
+        else
+            esp.Box.Visible = false
+        end
+
+        if self.Settings.Name then
+            esp.Name.Visible = true
+            esp.Name.Color = self.Settings.Color
+            esp.Name.Size = 18
+            esp.Name.Text = player.Name
+            esp.Name.Position = Vector2.new(screenPos.X, screenPos.Y - 120)
+            esp.Name.Center = true
+            esp.Name.Outline = true
+        else
+            esp.Name.Visible = false
+        end
+
+        if self.Settings.Health then
+            esp.Health.Visible = true
+            esp.Health.Color = Color3.new(0, 1, 0)
+            esp.Health.Size = 16
+            esp.Health.Text = "Health: "..math.floor(player.Character.Humanoid.Health)
+            esp.Health.Position = Vector2.new(screenPos.X, screenPos.Y - 100)
+            esp.Health.Center = true
+            esp.Health.Outline = true
+        else
+            esp.Health.Visible = false
+        end
+
+        if self.Settings.Distance then
+            esp.Distance.Visible = true
+            esp.Distance.Color = Color3.new(1, 1, 1)
+            esp.Distance.Size = 16
+            esp.Distance.Text = math.floor(distance).."studs"
+            esp.Distance.Position = Vector2.new(screenPos.X, screenPos.Y - 80)
+            esp.Distance.Center = true
+            esp.Distance.Outline = true
+        else
+            esp.Distance.Visible = false
+        end
+    end
+end
+local ESPGroup = Tabs.Main:AddLeftGroupbox('Drawing Visuals')
+
+local ESPToggle = ESPGroup:AddToggle('ESPToggle', {
+    Text = 'Enable',
+    Default = false,
+    Callback = function(state)
+        ESPLib:Toggle(state)
+    end
+})
+
+local ESPColor = ESPToggle:AddColorPicker('ESPColor', {
+    Default = Color3.new(1, 0, 0),
+    Callback = function(color)
+        ESPLib.Settings.Color = color
+    end
+})
+
+ESPToggle:OnChanged(function(state)
+    ESPLib.Settings.Enabled = state
+end)
+
+ESPGroup:AddToggle('ESPBox', {
+    Text = 'Box ESP',
+    Default = true,
+    Callback = function(state)
+        ESPLib.Settings.Box = state
+    end
+})
+
+ESPGroup:AddToggle('ESPName', {
+    Text = 'Name ESP',
+    Default = true,
+    Callback = function(state)
+        ESPLib.Settings.Name = state
+    end
+})
+
+ESPGroup:AddToggle('ESPHealth', {
+    Text = 'Health ESP',
+    Default = true,
+    Callback = function(state)
+        ESPLib.Settings.Health = state
+    end
+})
+
+ESPGroup:AddToggle('ESPDistance', {
+    Text = 'Distance ESP',
+    Default = true,
+    Callback = function(state)
+        ESPLib.Settings.Distance = state
+    end
+})
+ESPGroup:AddToggle('ESPTeamCheck', {
+    Text = 'Team Check',
+    Default = false,
+    Callback = function(state)
+        ESPLib.Settings.TeamCheck = state
+    end
+})
+ESPGroup:AddSlider('ESPDistanceLimit', {
+    Text = 'Max Distance',
+    Default = 1000,
+    Min = 0,
+    Max = 5000,
+    Rounding = 0,
+    Callback = function(value)
+        ESPLib.Settings.MaxDistance = value
+    end
+})
+
+ESPGroup:AddSlider('ESPRefreshRate', {
+    Text = 'Refresh Rate (ms)',
+    Default = 100,
+    Min = 16,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        ESPLib.Settings.RefreshRate = value
+    end
+})
+
+ESPGroup:AddSlider('ESPTransparency', {
+    Text = 'Transparency',
+    Default = 0,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(value)
+        ESPLib.Settings.Transparency = value
+    end
+})
+
+ESPLib:Init()
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
