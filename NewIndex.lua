@@ -1388,6 +1388,7 @@ end)
 
 RunService.RenderStepped:Connect(UpdateESP)
 --]]
+--[[
 local ESPLib = {
     Objects = {},
     Enabled = false,
@@ -1504,7 +1505,6 @@ function ESPLib:Update()
         end
     end
 end
-local ESPGroup = Tabs.Main:AddLeftGroupbox('Drawing Visuals')
 
 local ESPToggle = ESPGroup:AddToggle('ESPToggle', {
     Text = 'Enable',
@@ -1597,6 +1597,320 @@ ESPGroup:AddSlider('ESPTransparency', {
 })
 
 ESPLib:Init()
+--]]
+local ESP = {
+    Enabled = false,
+    Objects = {},
+    Connections = {},
+    Settings = {
+        Box = true,
+        Name = true,
+        HealthBar = true,
+        TeamCheck = false,
+        Color = Color3.new(1, 0, 0),
+        MaxDistance = 1000,
+        RefreshRate = 16,
+        Outline = true
+    }
+}
+
+function ESP:Init()
+    self.Connections.playerAdded = game:GetService("Players").PlayerAdded:Connect(function(player)
+        self:TrackPlayer(player)
+    end)
+
+    self.Connections.playerRemoving = game:GetService("Players").PlayerRemoving:Connect(function(player)
+        self:RemovePlayer(player)
+    end)
+
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= game:GetService("Players").LocalPlayer then
+            self:TrackPlayer(player)
+        end
+    end
+
+    self.Connections.renderStep = game:GetService("RunService").RenderStepped:Connect(function()
+        if not self.Enabled then return end
+        self:Update()
+    end)
+end
+
+function ESP:TrackPlayer(player)
+    self.Connections[player] = player.CharacterAdded:Connect(function(character)
+        if self.Objects[player] then
+            self:RemovePlayer(player)
+        end
+        self:CreateESP(player, character)
+    end)
+
+    if player.Character then
+        self:CreateESP(player, player.Character)
+    end
+end
+
+function ESP:RemovePlayer(player)
+    if self.Objects[player] then
+        for _, drawing in pairs(self.Objects[player]) do
+            drawing:Remove()
+        end
+        self.Objects[player] = nil
+    end
+
+    if self.Connections[player] then
+        self.Connections[player]:Disconnect()
+        self.Connections[player] = nil
+    end
+end
+
+function ESP:CreateESP(player, character)
+    if not character:FindFirstChild("HumanoidRootPart") then return end
+
+    self.Objects[player] = {
+        BoxOutline = Drawing.new("Square"),
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        HealthBarOutline = Drawing.new("Square"),
+        HealthBar = Drawing.new("Square"),
+        HealthBarBackground = Drawing.new("Square")
+    }
+
+    local esp = self.Objects[player]
+
+    esp.BoxOutline.Visible = false
+    esp.BoxOutline.Thickness = 3
+    esp.BoxOutline.Filled = false
+    esp.BoxOutline.ZIndex = 1
+
+    esp.Box.Visible = false
+    esp.Box.Thickness = 1
+    esp.Box.Filled = false
+    esp.Box.ZIndex = 2
+
+    esp.Name.Visible = false
+    esp.Name.Size = 18
+    esp.Name.Center = true
+    esp.Name.Outline = self.Settings.Outline
+    esp.Name.ZIndex = 3
+
+    esp.HealthBarOutline.Visible = false
+    esp.HealthBarOutline.Filled = false
+    esp.HealthBarOutline.Thickness = 2
+    esp.HealthBarOutline.ZIndex = 1
+
+    esp.HealthBarBackground.Visible = false
+    esp.HealthBarBackground.Filled = true
+    esp.HealthBarBackground.Color = Color3.new(0, 0, 0)
+    esp.HealthBarBackground.Transparency = 0.5
+    esp.HealthBarBackground.ZIndex = 2
+
+    esp.HealthBar.Visible = false
+    esp.HealthBar.Filled = true
+    esp.HealthBar.ZIndex = 3
+end
+
+function ESP:Update()
+    local camera = workspace.CurrentCamera
+    local localPlayer = game:GetService("Players").LocalPlayer
+
+    for player, esp in pairs(self.Objects) do
+        if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") or not player.Character:FindFirstChild("Humanoid") then
+            esp.BoxOutline.Visible = false
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.HealthBarOutline.Visible = false
+            esp.HealthBar.Visible = false
+            esp.HealthBarBackground.Visible = false
+            continue
+        end
+
+        if self.Settings.TeamCheck and player.Team == localPlayer.Team then
+            esp.BoxOutline.Visible = false
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.HealthBarOutline.Visible = false
+            esp.HealthBar.Visible = false
+            esp.HealthBarBackground.Visible = false
+            continue
+        end
+
+        local rootPart = player.Character.HumanoidRootPart
+        local distance = (rootPart.Position - camera.CFrame.Position).Magnitude
+
+        if distance > self.Settings.MaxDistance then
+            esp.BoxOutline.Visible = false
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.HealthBarOutline.Visible = false
+            esp.HealthBar.Visible = false
+            esp.HealthBarBackground.Visible = false
+            continue
+        end
+
+        local screenPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+
+        if not onScreen then
+            esp.BoxOutline.Visible = false
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.HealthBarOutline.Visible = false
+            esp.HealthBar.Visible = false
+            esp.HealthBarBackground.Visible = false
+            continue
+        end
+
+        local character = player.Character
+        local humanoid = character.Humanoid
+        local head = character:FindFirstChild("Head")
+        local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+
+        if not head or not torso then goto continue end
+
+        local headPos = camera:WorldToViewportPoint(head.Position)
+        local torsoPos = camera:WorldToViewportPoint(torso.Position)
+
+        local height = (headPos.Y - torsoPos.Y) * 2
+        local width = height * 0.5
+
+        local boxPosition = Vector2.new(torsoPos.X - width / 2, torsoPos.Y - height / 2)
+        local boxSize = Vector2.new(width, height)
+
+        esp.BoxOutline.Visible = self.Settings.Box and self.Enabled
+        esp.BoxOutline.Position = boxPosition - Vector2.new(1, 1)
+        esp.BoxOutline.Size = boxSize + Vector2.new(2, 2)
+        esp.BoxOutline.Color = Color3.new(0, 0, 0)
+
+        esp.Box.Visible = self.Settings.Box and self.Enabled
+        esp.Box.Position = boxPosition
+        esp.Box.Size = boxSize
+        esp.Box.Color = self.Settings.Color
+
+        esp.Name.Visible = self.Settings.Name and self.Enabled
+        esp.Name.Position = Vector2.new(torsoPos.X, boxPosition.Y - 20)
+        esp.Name.Text = player.Name
+        esp.Name.Color = self.Settings.Color
+
+        local healthPercent = humanoid.Health / humanoid.MaxHealth
+        local healthBarHeight = boxSize.Y * healthPercent
+        local healthBarPosition = boxPosition - Vector2.new(6, 0)
+        local healthBarSize = Vector2.new(3, boxSize.Y)
+
+        esp.HealthBarOutline.Visible = self.Settings.HealthBar and self.Enabled
+        esp.HealthBarOutline.Position = healthBarPosition - Vector2.new(1, 1)
+        esp.HealthBarOutline.Size = healthBarSize + Vector2.new(2, 2)
+        esp.HealthBarOutline.Color = Color3.new(0, 0, 0)
+
+        esp.HealthBarBackground.Visible = self.Settings.HealthBar and self.Enabled
+        esp.HealthBarBackground.Position = healthBarPosition
+        esp.HealthBarBackground.Size = healthBarSize
+
+        esp.HealthBar.Visible = self.Settings.HealthBar and self.Enabled
+        esp.HealthBar.Position = healthBarPosition + Vector2.new(0, boxSize.Y - healthBarHeight)
+        esp.HealthBar.Size = Vector2.new(3, healthBarHeight)
+        esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
+
+        continue
+    end
+end
+
+function ESP:Toggle(state)
+    self.Enabled = state
+    if not state then
+        for _, esp in pairs(self.Objects) do
+            esp.BoxOutline.Visible = false
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.HealthBarOutline.Visible = false
+            esp.HealthBar.Visible = false
+            esp.HealthBarBackground.Visible = false
+        end
+    end
+end
+
+function ESP:Destroy()
+    for _, connection in pairs(self.Connections) do
+        connection:Disconnect()
+    end
+
+    for _, esp in pairs(self.Objects) do
+        for _, drawing in pairs(esp) do
+            drawing:Remove()
+        end
+    end
+
+    table.clear(self.Connections)
+    table.clear(self.Objects)
+end
+
+ESP:Init()
+local ESPGroup = Tabs.Main:AddLeftGroupbox('Drawing Visuals')
+local ESPToggle = ESPGroup:AddToggle('ESPToggle', {
+    Text = 'Enable ESP',
+    Default = false,
+    Callback = function(state)
+        ESP:Toggle(state)
+    end
+})
+
+local ESPColor = ESPToggle:AddColorPicker('ESPColor', {
+    Default = Color3.new(1, 0, 0),
+    Callback = function(color)
+        ESP.Settings.Color = color
+    end
+})
+
+ESPGroup:AddToggle('ESPBox', {
+    Text = 'Box ESP',
+    Default = true,
+    Callback = function(state)
+        ESP.Settings.Box = state
+    end
+})
+
+ESPGroup:AddToggle('ESPName', {
+    Text = 'Name ESP',
+    Default = true,
+    Callback = function(state)
+        ESP.Settings.Name = state
+    end
+})
+
+ESPGroup:AddToggle('ESPHealthBar', {
+    Text = 'Health Bar',
+    Default = true,
+    Callback = function(state)
+        ESP.Settings.HealthBar = state
+    end
+})
+
+ESPGroup:AddToggle('ESPTeamCheck', {
+    Text = 'Team Check',
+    Default = false,
+    Callback = function(state)
+        ESP.Settings.TeamCheck = state
+    end
+})
+
+ESPGroup:AddSlider('ESPDistanceLimit', {
+    Text = 'Max Distance',
+    Default = 1000,
+    Min = 0,
+    Max = 5000,
+    Rounding = 0,
+    Callback = function(value)
+        ESP.Settings.MaxDistance = value
+    end
+})
+
+ESPGroup:AddSlider('ESPRefreshRate', {
+    Text = 'Refresh Rate (ms)',
+    Default = 16,
+    Min = 16,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        ESP.Settings.RefreshRate = value
+    end
+})
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
