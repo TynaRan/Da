@@ -259,6 +259,7 @@ local function CreateRichTracer(startPos, endPos)
     Debris:AddItem(tracer, totalDuration)
 end
     --]]
+--[[
 local function CreateRichTracer(startPos, endPos)
     if not Settings.BulletTracers then return end
 
@@ -425,6 +426,151 @@ local function CreateRichTracer(startPos, endPos)
             sparkles.Lifetime = NumberRange.new(0.1)
             sparkles.Rate = 5
         end
+    end)
+
+    Debris:AddItem(tracer, totalDuration)
+end
+--]]
+local function CreateRichTracer(startPos, endPos)
+    if not Settings.BulletTracers then return end
+
+    local TweenService = game:GetService("TweenService")
+    local Debris = game:GetService("Debris")
+    local RunService = game:GetService("RunService")
+
+    local direction = (endPos - startPos).Unit
+    local distance = (startPos - endPos).Magnitude
+    local curveHeight = math.clamp(distance * 0.1, 1, 5)
+    local midPoint = (startPos + endPos) / 2 + Vector3.new(0, curveHeight, 0)
+
+    local tracer = Instance.new('Part')
+    tracer.Size = Vector3.new(0, 0, 0)
+    tracer.CFrame = CFrame.lookAt(startPos, endPos)
+    tracer.Anchored = true
+    tracer.CanCollide = false
+    tracer.Material = Enum.Material.Neon
+    tracer.Color = Settings.TracerColor
+    tracer.Transparency = 1
+    tracer.CastShadow = false
+    tracer.Parent = workspace
+
+    local mesh = Instance.new("SpecialMesh", tracer)
+    mesh.MeshType = Enum.MeshType.Cylinder
+    mesh.Scale = Vector3.new(1, 1, 0)
+
+    local function GetBezierPosition(t)
+        return startPos:Lerp(midPoint, t):Lerp(endPos:Lerp(midPoint, t), t)
+    end
+
+    local glow = Instance.new('SurfaceGui', tracer)
+    glow.Face = Enum.NormalId.Top
+    glow.AlwaysOnTop = true
+    glow.Adornee = tracer
+    glow.LightInfluence = 0
+    glow.ZOffset = 1
+    
+    local frame = Instance.new('Frame', glow)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Settings.TracerColor
+    frame.BackgroundTransparency = 0.7
+    frame.BorderSizePixel = 0
+
+    local sparkles = Instance.new('ParticleEmitter', tracer)
+    sparkles.LightEmission = 1
+    sparkles.Texture = "rbxassetid://296874871"
+    sparkles.Color = ColorSequence.new(Settings.TracerColor)
+    sparkles.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.5),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    sparkles.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    sparkles.Speed = NumberRange.new(2)
+    sparkles.Lifetime = NumberRange.new(0.3)
+    sparkles.Rate = 50
+    sparkles.Rotation = NumberRange.new(0, 360)
+    sparkles.EmissionDirection = Enum.NormalId.Front
+    sparkles.Enabled = false
+
+    local meshPart = Instance.new("MeshPart")
+    meshPart.MeshId = "rbxassetid://9856898030"
+    meshPart.TextureID = "rbxassetid://9856897896"
+    meshPart.Size = Vector3.new(0.5, 0.5, 0.5)
+    meshPart.CFrame = tracer.CFrame * CFrame.new(0, 0, -distance/2)
+    meshPart.Anchored = true
+    meshPart.CanCollide = false
+    meshPart.Material = Enum.Material.Neon
+    meshPart.Color = Settings.TracerColor
+    meshPart.Transparency = 1
+    meshPart.Parent = tracer
+
+    local trail = Instance.new("Trail", tracer)
+    trail.Attachment0 = Instance.new("Attachment", tracer)
+    trail.Attachment1 = Instance.new("Attachment", tracer)
+    trail.Color = ColorSequence.new(Settings.TracerColor)
+    trail.LightEmission = 1
+    trail.Transparency = NumberSequence.new(0.5)
+    trail.Lifetime = 0.3
+    trail.Enabled = false
+
+    local totalDuration = Settings.TracerDuration
+    local appearTime = 0.08
+    local sustainTime = totalDuration * 0.3
+    local fadeTime = totalDuration * 0.7
+
+    local sizeTween = TweenService:Create(tracer, TweenInfo.new(appearTime, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = Vector3.new(Settings.TracerWidth, Settings.TracerWidth, distance)
+    })
+
+    local meshTween = TweenService:Create(mesh, TweenInfo.new(appearTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Scale = Vector3.new(1, 1, distance * 0.1)
+    })
+
+    local fadeTween = TweenService:Create(tracer, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Transparency = 1,
+        Size = Vector3.new(0, 0, distance * 1.2)
+    })
+
+    local meshPartTween = TweenService:Create(meshPart, TweenInfo.new(appearTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Transparency = 0.3,
+        Size = Vector3.new(2, 2, 2)
+    })
+
+    local trailTween = TweenService:Create(trail, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Transparency = NumberSequence.new(1)
+    })
+
+    local connection
+    local startTime = os.clock()
+    connection = RunService.Heartbeat:Connect(function()
+        local elapsed = os.clock() - startTime
+        local progress = math.min(elapsed / appearTime, 1)
+        
+        if progress < 1 then
+            local currentPos = GetBezierPosition(progress)
+            tracer.CFrame = CFrame.lookAt(currentPos, endPos)
+            meshPart.CFrame = tracer.CFrame * CFrame.new(0, 0, -distance/2) * CFrame.Angles(0, elapsed * 10, 0)
+        else
+            connection:Disconnect()
+        end
+    end)
+
+    sizeTween:Play()
+    meshTween:Play()
+    meshPartTween:Play()
+    trailTween:Play()
+    sparkles.Enabled = true
+    trail.Enabled = true
+
+    tracer.Transparency = 0.3
+    meshPart.Transparency = 0.3
+
+    delay(appearTime + sustainTime, function()
+        fadeTween:Play()
+        sparkles.Lifetime = NumberRange.new(0.1)
+        sparkles.Rate = 5
     end)
 
     Debris:AddItem(tracer, totalDuration)
